@@ -25,7 +25,6 @@ probe_key = os.environ['probe_key']
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///temperature.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.add_url_rule('/favicon.ico', redirect_to=url_for('static', filename='favicon.ico'))
 db = SQLAlchemy(app)
 
 cron = BackgroundScheduler()
