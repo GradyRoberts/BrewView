@@ -18,11 +18,11 @@ from flask import Flask, render_template, request, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 
 # Dev
-from config import weather_key, probe_key
+#from config import weather_key, probe_key
 
 # Production
-#weather_key = os.environ['weather_key']
-#probe_key = os.environ['probe_key']
+weather_key = os.environ['weather_key']
+probe_key = os.environ['probe_key']
 
 class Config(object):
     SCHEDULER_API_ENABLED = False
