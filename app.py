@@ -2,6 +2,7 @@
 
 import atexit
 import json
+import os
 import requests
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -14,12 +15,17 @@ from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 
-from config import weather_key, probe_key
+# Dev
+#from config import weather_key, probe_key
 
+# Production
+weather_key = os.environ['weather_key']
+probe_key = os.environ['probe_key']
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///temperature.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.add_url_rule('/favicon.ico', redirect_to=url_for('static', filename='favicon.ico'))
 db = SQLAlchemy(app)
 
 cron = BackgroundScheduler()
