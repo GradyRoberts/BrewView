@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+
+{% block head %}
+<title>Brew View</title>
+{{ resources|safe }}
+{{ script|safe }}
+{% endblock %}
+
+{% block body %}
+<div class="content">
+    <h1>Brew View</h1>
+
+    <div class='bokeh' style="width: 800px; margin: auto;">
+        {{ div|safe }}
+    </div>
+
+    <div>
+        <form action="/" method="POST">
+            <input type="hidden" name="key">
+            <input type="hidden" name="temp_C">
+            <input type="hidden" name="temp_F">
+        </form>
+    </div>
+
+</div>
+{% endblock %}
