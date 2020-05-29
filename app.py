@@ -4,11 +4,12 @@ import atexit
 import json
 import os
 import requests
+from math import pi
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from bokeh.embed import components
-from bokeh.models import HoverTool, ColumnDataSource
+from bokeh.models import HoverTool, ColumnDataSource, DatetimeTickFormatter
 from bokeh.plotting import figure
 from bokeh.resources import CDN
 from datetime import datetime
@@ -45,6 +46,8 @@ def get_outside_temp():
     try:
         db.session.add(new_temp)
         db.session.commit()
+        print(f"{datetime.now()} - Added external temp ({temp_C}, {temp_F})")
+        return
     except:
         return 'There was a problem adding external temp'
 
@@ -80,8 +83,8 @@ def make_plot():
 
     inside_hover = HoverTool(
         tooltips=[
-            ('Time', '@inside_time'),
-            ('Inside', '@inside_temp'),
+            ('Time', '@inside_time{%m/%d %I:%M:%S %p}'),
+            ('Inside', '@inside_temp{0.00}'),
         ],
 
         formatters={
@@ -92,8 +95,8 @@ def make_plot():
     )
     outside_hover = HoverTool(
         tooltips=[
-            ('Time', '@outside_time'),
-            ('Outside', '@outside_temp'),
+            ('Time', '@outside_time{%m/%d %I:%M:%S %p}'),
+            ('Outside', '@outside_temp{0.00}'),
         ],
 
         formatters={
@@ -103,7 +106,15 @@ def make_plot():
         mode='vline'
     )
 
-    p = figure(plot_width=700, plot_height=700, tools=[inside_hover, outside_hover], title="Temperature over time", background_fill_color="#EFEFEF")
+    p = figure(plot_width=700, plot_height=700, tools=[inside_hover, outside_hover], title="Temperature over time", background_fill_color="#EFEFEF", x_axis_type='datetime')
+    p.xaxis.formatter = DatetimeTickFormatter(
+        minutes=[r"%m/%d %I:%M:%S %p"],
+        hours=[r"%m/%d %I:%M:%S %p"],
+        days=[r"%m/%d %I:%M:%S %p"],
+        months=[r"%m/%d %I:%M:%S %p"],
+        years=[r"%m/%d %I:%M:%S %p"],
+    )
+    p.xaxis.major_label_orientation = pi/4
     p.xaxis.axis_label = 'Time'
     p.yaxis.axis_label = 'Temp (°F)'
 
@@ -131,6 +142,7 @@ def index():
         try:
             db.session.add(new_temp)
             db.session.commit()
+            print(f"{datetime.now()} - Added internal temp ({temp_C}, {temp_F})")
             return f"{datetime.now()} - Successfully added internal temp ({temp_C},{temp_F})!"
         except:
             return 'There was a problem adding internal temp'
@@ -153,4 +165,4 @@ def handle_bad_request(error):
 #     shutdown_server()ackground
 if __name__ == '__main__':
     atexit.register(lambda: cron.shutdown(wait=True))
-    app.run(debug=True)
+    app.run(debug=False, use_reloader=False)
