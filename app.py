@@ -44,7 +44,7 @@ def time_diff_minutes(old_time):
     return delta.total_seconds()/60
 
 #@scheduler.task('cron', id='get_outside', minute='*/5')
-@cron.scheduled_job('cron', minute='*/2')
+@cron.scheduled_job('cron', minute='*/5')
 def get_outside_temp():
     global last_executed
     if time_diff_minutes(last_executed) < 1.0: # try to prevent double scheduling
