@@ -6,7 +6,8 @@ import os
 import requests
 from math import pi
 
-from apscheduler.schedulers.background import BackgroundScheduler
+#from apscheduler.schedulers.background import BackgroundScheduler
+from flask_apscheduler import APScheduler
 
 from bokeh.embed import components
 from bokeh.models import HoverTool, ColumnDataSource, DatetimeTickFormatter
@@ -17,21 +18,28 @@ from flask import Flask, render_template, request, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 
 # Dev
-#from config import weather_key, probe_key
+from config import weather_key, probe_key
 
 # Production
-weather_key = os.environ['weather_key']
-probe_key = os.environ['probe_key']
+#weather_key = os.environ['weather_key']
+#probe_key = os.environ['probe_key']
+
+class Config(object):
+    SCHEDULER_API_ENABLED = False
 
 app = Flask(__name__)
+app.config.from_object(Config())
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///temperature.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    
 db = SQLAlchemy(app)
 
-cron = BackgroundScheduler()
-cron.start()
+#cron = BackgroundScheduler()
+#cron.start()
+scheduler = APScheduler()
 
-@cron.scheduled_job('cron', minute='*/5')
+#@cron.scheduled_job('cron', minute='*/5')
+@scheduler.task('cron', id='get_outside', minute='*/5')
 def get_outside_temp():
     url = f"http://api.openweathermap.org/data/2.5/weather?id=4365227&appid={weather_key}"
     response = requests.get(url)
@@ -67,11 +75,16 @@ def make_plot():
     outside = Temperature.query.filter_by(isOutside=True).order_by(Temperature.timestamp).all()
     max_points = len(inside) if len(inside) < len(outside) else len(outside)
 
-    inside_time = [t.timestamp for t in inside][-max_points:]
-    inside_temp = [t.temp_F for t in inside][-max_points:]
-    
-    outside_time = [t.timestamp for t in outside][-max_points:]
-    outside_temp = [t.temp_F for t in outside][-max_points:]
+    inside_time = []
+    inside_temp = []
+    outside_time = []
+    outside_temp = []
+    if max_points > 0:
+        inside_time = [t.timestamp for t in inside][-max_points:]
+        inside_temp = [t.temp_F for t in inside][-max_points:]
+        
+        outside_time = [t.timestamp for t in outside][-max_points:]
+        outside_temp = [t.temp_F for t in outside][-max_points:]
 
     data = {
         'inside_time': inside_time,
@@ -108,7 +121,12 @@ def make_plot():
 
     p = figure(plot_width=700, plot_height=700, tools=[inside_hover, outside_hover], title="Temperature over time", background_fill_color="#EFEFEF", x_axis_type='datetime')
     p.xaxis.formatter = DatetimeTickFormatter(
+        microseconds = [r"%m/%d %I:%M:%S %p"],
+        milliseconds = [r"%m/%d %I:%M:%S %p"],
+        seconds = [r"%m/%d %I:%M:%S %p"],
+        minsec = [r"%m/%d %I:%M:%S %p"],
         minutes=[r"%m/%d %I:%M:%S %p"],
+        hourmin=[r"%m/%d %I:%M:%S %p"],
         hours=[r"%m/%d %I:%M:%S %p"],
         days=[r"%m/%d %I:%M:%S %p"],
         months=[r"%m/%d %I:%M:%S %p"],
@@ -153,16 +171,16 @@ def index():
 @app.errorhandler(400)
 def handle_bad_request(error):
     return 'Error 400: Bad Request'
+@app.errorhandler(404)
+def handle_bad_request(error):
+    return 'Error 404: Page does not exist'
 
-# def shutdown_server():
-#     func = request.environ.get('werkzeug.server.shutdown')
-#     if func is None:
-#         raise RuntimeError('Not running with the Werkzeug Server')
-#     func()
 
-# @app.route('/shutdown')
-# def shutdown():
-#     shutdown_server()ackground
 if __name__ == '__main__':
-    atexit.register(lambda: cron.shutdown(wait=True))
+    #atexit.register(lambda: cron.shutdown(wait=False))
+    atexit.register(lambda: scheduler.shutdown(wait=False))
+    
+    scheduler.init_app(app)
+    scheduler.start()
+
     app.run(debug=False, use_reloader=False)
