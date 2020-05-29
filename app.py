@@ -5,15 +5,15 @@ import json
 import os
 import requests
 from math import pi
+from datetime import datetime
 
-#from apscheduler.schedulers.background import BackgroundScheduler
-from flask_apscheduler import APScheduler
+from apscheduler.schedulers.background import BackgroundScheduler
+#from flask_apscheduler import APScheduler
 
 from bokeh.embed import components
 from bokeh.models import HoverTool, ColumnDataSource, DatetimeTickFormatter
 from bokeh.plotting import figure
 from bokeh.resources import CDN
-from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 
@@ -24,23 +24,32 @@ from flask_sqlalchemy import SQLAlchemy
 weather_key = os.environ['weather_key']
 probe_key = os.environ['probe_key']
 
-class Config(object):
-    SCHEDULER_API_ENABLED = False
+# class Config(object):
+#     SCHEDULER_API_ENABLED = False
 
 app = Flask(__name__)
-app.config.from_object(Config())
+#app.config.from_object(Config())
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///temperature.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     
 db = SQLAlchemy(app)
 
-#cron = BackgroundScheduler()
-#cron.start()
-scheduler = APScheduler()
+cron = BackgroundScheduler(daemon=True)
+cron.start()
+last_executed = datetime.now()
+#scheduler = APScheduler()
 
-#@cron.scheduled_job('cron', minute='*/5')
-@scheduler.task('cron', id='get_outside', minute='*/5')
+def time_diff_minutes(old_time):
+    delta = datetime.now() - old_time
+    return delta.total_seconds()/60
+
+#@scheduler.task('cron', id='get_outside', minute='*/5')
+@cron.scheduled_job('cron', minute='*/2')
 def get_outside_temp():
+    global last_executed
+    if time_diff_minutes(last_executed) < 1.0: # try to prevent double scheduling
+        print(f"{datetime.now()} - Stopped a double scheduling")
+        return
     url = f"http://api.openweathermap.org/data/2.5/weather?id=4365227&appid={weather_key}"
     response = requests.get(url)
     if response.status_code != 200:
@@ -54,6 +63,7 @@ def get_outside_temp():
     try:
         db.session.add(new_temp)
         db.session.commit()
+        last_executed = datetime.now()
         print(f"{datetime.now()} - Added external temp ({temp_C}, {temp_F})")
         return
     except:
@@ -177,10 +187,10 @@ def handle_bad_request(error):
 
 
 if __name__ == '__main__':
-    #atexit.register(lambda: cron.shutdown(wait=False))
-    atexit.register(lambda: scheduler.shutdown(wait=False))
+    atexit.register(lambda: cron.shutdown(wait=False))
+    #atexit.register(lambda: scheduler.shutdown(wait=False))
     
-    scheduler.init_app(app)
-    scheduler.start()
+    #scheduler.init_app(app)
+    #scheduler.start()
 
     app.run(debug=False, use_reloader=False)
