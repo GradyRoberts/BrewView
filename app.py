@@ -15,11 +15,11 @@ from flask import Flask, render_template, request, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 
 # Dev
-from config import weather_key, pi_key
+#from config import weather_key, pi_key
 
 # Production
-#weather_key = os.environ['weather_key']
-#pi_key = os.environ['pi_key']
+weather_key = os.environ['weather_key']
+pi_key = os.environ['pi_key']
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///temperature.db'
