@@ -7,9 +7,6 @@ import requests
 from math import pi
 from datetime import datetime
 
-from apscheduler.schedulers.background import BackgroundScheduler
-#from flask_apscheduler import APScheduler
-
 from bokeh.embed import components
 from bokeh.models import HoverTool, ColumnDataSource, DatetimeTickFormatter
 from bokeh.plotting import figure
@@ -18,62 +15,17 @@ from flask import Flask, render_template, request, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 
 # Dev
-#from config import weather_key, probe_key
+from config import weather_key, pi_key
 
 # Production
-weather_key = os.environ['weather_key']
-probe_key = os.environ['probe_key']
-
-# class Config(object):
-#     SCHEDULER_API_ENABLED = False
+#weather_key = os.environ['weather_key']
+#pi_key = os.environ['pi_key']
 
 app = Flask(__name__)
-#app.config.from_object(Config())
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///temperature.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     
 db = SQLAlchemy(app)
-
-cron = BackgroundScheduler(daemon=True)
-#scheduler = APScheduler()
-
-last_executed = datetime.now()
-@app.before_first_request
-def cron_init():
-    global last_executed
-    print("Scheduler started!")
-    cron.start()
-    last_executed = datetime.now()
-
-def time_diff_minutes(old_time):
-    delta = datetime.now() - old_time
-    return delta.total_seconds()/60
-
-#@scheduler.task('cron', id='get_outside', minute='*/5')
-@cron.scheduled_job('cron', minute='*/5')
-def get_outside_temp():
-    global last_executed
-    if time_diff_minutes(last_executed) < 1.0: # try to prevent double scheduling
-        print(f"{datetime.now()} - Stopped a double scheduling")
-        return
-    url = f"http://api.openweathermap.org/data/2.5/weather?id=4365227&appid={weather_key}"
-    response = requests.get(url)
-    if response.status_code != 200:
-        raise Exception
-    data = response.json()
-    temp_K = data['main']['temp']
-    temp_C = temp_K - 273.15
-    temp_F = (temp_C * (9/5)) + 32
-    
-    new_temp = Temperature(isOutside=True, temp_C=temp_C, temp_F=temp_F)
-    try:
-        db.session.add(new_temp)
-        db.session.commit()
-        last_executed = datetime.now()
-        print(f"{datetime.now()} - Added external temp ({temp_C}, {temp_F})")
-        return
-    except:
-        return 'There was a problem adding external temp'
 
 class Temperature(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -161,28 +113,48 @@ def make_plot():
     p.tools[1].renderers = [outside_circle]
     return components(p)
 
-@app.route('/', methods=['POST', 'GET'])
+@app.route('/', methods=['GET'])
 def index():
-    if request.method == 'POST':
-        # Incoming temperature data from temp probe
-        key = request.form['key']
-        if key != probe_key:
-            print(f"{datetime.now()} - Unauthorized upload attempt using key {key} from {request.remote_addr}.")
-            return redirect('/')
-
-        temp_C = request.form['temp_C']
-        temp_F = request.form['temp_F']
-        new_temp = Temperature(isOutside=False, temp_C=temp_C, temp_F=temp_F)
-        try:
-            db.session.add(new_temp)
-            db.session.commit()
-            print(f"{datetime.now()} - Added internal temp ({temp_C}, {temp_F})")
-            return f"{datetime.now()} - Successfully added internal temp ({temp_C},{temp_F})!"
-        except:
-            return 'There was a problem adding internal temp'
-    
     script, div = make_plot()
-    return render_template('index.html', script=script, div=div, resources=CDN.render()) 
+    return render_template('index.html', script=script, div=div, resources=CDN.render())
+
+@app.route('/add-data/inside/', methods=['POST'])
+def add_inside_data():
+    # Incoming temperature data from temp probe
+    key = request.form['key']
+    if key != pi_key:
+        print(f"{datetime.now()} - Unauthorized upload attempt using key {key} from {request.remote_addr}.")
+        return redirect('/')
+
+    temp_C = request.form['temp_C']
+    temp_F = request.form['temp_F']
+    new_temp = Temperature(isOutside=False, temp_C=temp_C, temp_F=temp_F)
+    try:
+        db.session.add(new_temp)
+        db.session.commit()
+        print(f"{datetime.now()} - Added internal temp ({temp_C}, {temp_F})")
+        return f"{datetime.now()} - Successfully added internal temp ({temp_C},{temp_F})!"
+    except:
+        return 'There was a problem adding internal temp'
+
+@app.route('/add-data/outside/', methods=['POST'])
+def add_outside_data():
+    # Incoming temperature data from weather API
+    key = request.form['key']
+    if key != probe_key:
+        print(f"{datetime.now()} - Unauthorized upload attempt using key {key} from {request.remote_addr}.")
+        return redirect('/')
+
+    temp_C = request.form['temp_C']
+    temp_F = request.form['temp_F']
+    new_temp = Temperature(isOutside=True, temp_C=temp_C, temp_F=temp_F)
+    try:
+        db.session.add(new_temp)
+        db.session.commit()
+        print(f"{datetime.now()} - Added external temp ({temp_C}, {temp_F})")
+        return f"{datetime.now()} - Successfully added external temp ({temp_C},{temp_F})!"
+    except:
+        return 'There was a problem adding external temp'
 
 @app.errorhandler(400)
 def handle_bad_request(error):
@@ -193,10 +165,4 @@ def handle_bad_request(error):
 
 
 if __name__ == '__main__':
-    atexit.register(lambda: cron.shutdown(wait=False))
-    #atexit.register(lambda: scheduler.shutdown(wait=False))
-    
-    #scheduler.init_app(app)
-    #scheduler.start()
-
     app.run(debug=False, use_reloader=False)
