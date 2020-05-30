@@ -35,9 +35,15 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 cron = BackgroundScheduler(daemon=True)
-cron.start()
-last_executed = datetime.now()
 #scheduler = APScheduler()
+
+last_executed = datetime.now()
+@app.before_first_request
+def cron_init():
+    global last_executed
+    print("Scheduler started!")
+    cron.start()
+    last_executed = datetime.now()
 
 def time_diff_minutes(old_time):
     delta = datetime.now() - old_time
