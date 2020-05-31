@@ -118,7 +118,7 @@ def index():
     script, div = make_plot()
     return render_template('index.html', script=script, div=div, resources=CDN.render())
 
-@app.route('/add-data/inside/', methods=['POST'])
+@app.route('/add-data/inside', methods=['POST'])
 def add_inside_data():
     # Incoming temperature data from temp probe
     key = request.form['key']
@@ -137,11 +137,11 @@ def add_inside_data():
     except:
         return 'There was a problem adding internal temp'
 
-@app.route('/add-data/outside/', methods=['POST'])
+@app.route('/add-data/outside', methods=['POST'])
 def add_outside_data():
     # Incoming temperature data from weather API
     key = request.form['key']
-    if key != probe_key:
+    if key != pi_key:
         print(f"{datetime.now()} - Unauthorized upload attempt using key {key} from {request.remote_addr}.")
         return redirect('/')
 
